@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
-//import 'package:racunalni_sah/champions.dart';
-//import 'package:racunalni_sah/chessopenings.dart';
 import 'choice.dart';
-//import 'package:racunalni_sah/tactics.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
