@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 //import 'package:racunalni_sah/champions.dart';
 //import 'package:racunalni_sah/chessopenings.dart';
-//import 'package:racunalni_sah/choice.dart';
+import 'choice.dart';
 //import 'package:racunalni_sah/tactics.dart';
 
 class HomePage extends StatelessWidget {
@@ -26,13 +26,13 @@ class HomePage extends StatelessWidget {
                 minimumSize: const Size(240, 160),
               ),
               onPressed: () {
-          /*      Navigator.of(context).push(
+                Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (BuildContext context) {
                       return const Choice();
                     },
                   ),
-                );*/
+                );
               },
               child: const Text(
                 'Play',
