@@ -1,21 +1,34 @@
 import 'package:flutter/material.dart';
-//import 'friend.dart';
-import 'computer_play.dart';
+import 'black.dart';
+import 'white.dart';
+import 'main.dart';
 
-class Choice extends StatefulWidget {
-  const Choice({super.key});
+class Color extends StatefulWidget {
+  const Color({super.key});
 
   @override
-  State<Choice> createState() => _ChoiceState();
+  State<Color> createState() => _ColorState();
 }
 
-class _ChoiceState extends State<Choice> {
+class _ColorState extends State<Color> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Chessmasters'),
         centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (BuildContext context) {
+                  return const RootPage();
+                },
+              ),
+            );
+          },
+        ),
       ),
       body: Center(
         child: Container(
@@ -37,13 +50,13 @@ class _ChoiceState extends State<Choice> {
                   Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (BuildContext context) {
-                        return const Color();
+                        return const BodyPage();
                       },
                     ),
                   );
                 },
                 child: const Text(
-                  'Play with computer',
+                  'Play as White',
                   style: TextStyle(
                       fontSize: 17,
                       fontStyle: FontStyle.italic,
@@ -51,7 +64,7 @@ class _ChoiceState extends State<Choice> {
                 ),
               ),
               const SizedBox(height: 40),
-         /*     ElevatedButton(
+              ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   shadowColor: Colors.greenAccent,
                   elevation: 3,
@@ -63,20 +76,20 @@ class _ChoiceState extends State<Choice> {
                   Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (BuildContext context) {
-                        return const Friend();
+                        return const Black();
                       },
                     ),
                   );
                 },
                 child: const Text(
-                  'Play with Friends',
+                  'Play as black ',
                   style: TextStyle(
                       fontSize: 17,
                       fontStyle: FontStyle.italic,
                       fontWeight: FontWeight.bold),
                 ),
               ),
-              const SizedBox(height: 40),*/
+              const SizedBox(height: 40),
             ],
           ),
         ),
