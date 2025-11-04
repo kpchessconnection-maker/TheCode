@@ -37,6 +37,8 @@ dependencies:
   flutter_chess_board: ^1.0.1
   chess: ^0.7.0
 
+  stockfish: ^1.7.1 # Use the latest version from pub.dev
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

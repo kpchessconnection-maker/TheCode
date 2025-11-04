@@ -1,16 +1,27 @@
+// lib/computer_play.dart (or whatever you have named this file)
+
 import 'package:flutter/material.dart';
 import 'black.dart';
-import 'white.dart';
-import 'main.dart';
+import 'white.dart'; // Assuming 'white.dart' contains 'BodyPage'
+import 'main.dart';   // Assuming 'main.dart' contains 'RootPage'
 
-class Color extends StatefulWidget {
-  const Color({super.key});
+// It's good practice to avoid using Dart's core type names for your widgets.
+// I've renamed 'Color' to 'ColorSelectionScreen' to prevent confusion.
+class ColorSelectionScreen extends StatefulWidget {
+  const ColorSelectionScreen({super.key});
 
   @override
-  State<Color> createState() => _ColorState();
+  State<ColorSelectionScreen> createState() => _ColorSelectionScreenState();
 }
 
-class _ColorState extends State<Color> {
+class _ColorSelectionScreenState extends State<ColorSelectionScreen> {
+  // --- FIX APPLIED HERE ---
+  // 1.  A 'currentFen' variable is now defined for this state.
+  // 2.  It's initialized with the standard FEN string for the start of a chess game.
+  //
+  // This variable will hold the state of the chessboard.
+  String currentFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -20,7 +31,7 @@ class _ColorState extends State<Color> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
-            Navigator.of(context).push(
+            Navigator.of(context).pushReplacement( // Using pushReplacement is often better for "back" buttons
               MaterialPageRoute(
                 builder: (BuildContext context) {
                   return const RootPage();
@@ -50,6 +61,7 @@ class _ColorState extends State<Color> {
                   Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (BuildContext context) {
+                        // Assuming BodyPage is for playing as White
                         return const BodyPage();
                       },
                     ),
@@ -76,7 +88,10 @@ class _ColorState extends State<Color> {
                   Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (BuildContext context) {
-                        return const Black();
+                        // --- FIX APPLIED HERE ---
+                        // Now 'currentFen' exists and can be passed to BlackPlayerScreen.
+                        // We also remove 'const' because 'currentFen' is a variable, not a compile-time constant.
+                        return BlackPlayerScreen(initialFen: currentFen);
                       },
                     ),
                   );

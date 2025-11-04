@@ -37,7 +37,7 @@ class _ChoiceState extends State<Choice> {
                   Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (BuildContext context) {
-                        return const Color();
+                        return const ColorSelectionScreen();
                       },
                     ),
                   );

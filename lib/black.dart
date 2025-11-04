@@ -1,204 +1,148 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_chess_board/flutter_chess_board.dart';
-import 'package:chess/chess.dart' as chess;
-import 'dart:math';
 
-class Black extends StatefulWidget {
-  const Black({super.key});
+// black.dart
+
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:stockfish/stockfish.dart';
+
+// You will also need a chess logic library to validate moves and manage the board state.
+// The 'chess' package is a popular choice. Add it to your pubspec.yaml.
+// Example: import 'package:chess/chess.dart' as chess;
+
+class BlackPlayerScreen extends StatefulWidget {
+  // You might pass the initial board state (FEN string) to this screen.
+  final String initialFen;
+
+  const BlackPlayerScreen({Key? key, required this.initialFen}) : super(key: key);
+
   @override
-  State<Black> createState() => _BlackPageState();
+  _BlackPlayerScreenState createState() => _BlackPlayerScreenState();
 }
 
-class _BlackPageState extends State<Black> {
-  ChessBoardController controller = ChessBoardController();
-  chess.Chess game = chess.Chess();
-
-  double alphaBeta(chess.Chess game, int depth, double alpha, double beta,
-      bool maximizingPlayer) {
-    if (depth == 0 || game.game_over) {
-      return evaluateBoard(game);
-    }
-
-    var moves = game.moves();
-    if (maximizingPlayer) {
-      double maxEval = double.negativeInfinity;
-      for (var move in moves) {
-        game.move(move);
-        double eval = alphaBeta(game, depth - 1, alpha, beta, false);
-        game.undo();
-        maxEval = max(maxEval, eval);
-        alpha = max(alpha, eval);
-        if (beta <= alpha) {
-          break;
-        }
-      }
-      return maxEval;
-    } else {
-      double minEval = double.infinity;
-      for (var move in moves) {
-        game.move(move);
-        double eval = alphaBeta(game, depth - 1, alpha, beta, true);
-        game.undo();
-        minEval = min(minEval, eval);
-        beta = min(beta, eval);
-        if (beta <= alpha) {
-          break;
-        }
-      }
-      return minEval;
-    }
-  }
-
-  List<String> sortMoves(List<String> moves) {
-    moves.sort((a, b) {
-      if (a.contains('x') && !b.contains('x')) {
-        return -1;
-      } else if (!a.contains('x') && b.contains('x')) {
-        return 1;
-      } else {
-        return 0;
-      }
-    });
-    return moves;
-  }
-
-  void makeBestMove() {
-    // ignore: prefer_typing_uninitialized_variables
-    var bestMove;
-    var bestValue = double.negativeInfinity;
-    var moves = game.moves();
-    for (var move in moves) {
-      game.move(move);
-      var boardValue =
-      alphaBeta(game, 2, double.negativeInfinity, double.infinity, false);
-      game.undo();
-      if (boardValue > bestValue) {
-        bestValue = boardValue;
-        bestMove = move;
-      }
-    }
-    game.move(bestMove);
-    controller.game = game;
-    if (bestMove.length >= 4) {
-      var from = bestMove.substring(0, 2);
-      var to = bestMove.substring(2, 4);
-      controller.makeMove(from: from, to: to);
-    }
-  }
-
-  double evaluateBoard(chess.Chess game) {
-    double score = 0.0;
-    String board = game.fen.split(' ')[0];
-    for (int i = 0; i < board.length; i++) {
-      switch (board[i]) {
-        case 'P':
-          score += 100;
-          break;
-        case 'p':
-          score -= 100;
-          break;
-        case 'N':
-        case 'B':
-          score += 300;
-          break;
-        case 'n':
-        case 'b':
-          score -= 300;
-          break;
-        case 'R':
-          score += 500;
-          break;
-        case 'r':
-          score -= 500;
-          break;
-        case 'Q':
-          score += 900;
-          break;
-        case 'q':
-          score -= 900;
-          break;
-      }
-    }
-    return score;
-  }
+class _BlackPlayerScreenState extends State<BlackPlayerScreen> {
+  late final Stockfish stockfish;
+  StreamSubscription? _stockfishSubscription;
+  String _engineMove = '';
+  String _currentFen = '';
+  bool _isEngineThinking = false;
 
   @override
   void initState() {
     super.initState();
-    controller = ChessBoardController();
-    controller.addListener(() {
-      game = controller.game;
-      if (controller.game.turn == chess.Color.WHITE) {
-        Future.delayed(const Duration(seconds: 1), () {
-          if (mounted) {
-            setState(() {
-              makeBestMove();
-            });
-          }
-        });
+    _currentFen = widget.initialFen;
+
+    // 1. Create an instance of the Stockfish engine.
+    stockfish = Stockfish();
+
+    // 2. Listen for output from the engine.
+    _stockfishSubscription = stockfish.stdout.listen((message) {
+      print("Engine says: $message"); // For debugging
+
+      // Check if the message contains the best move.
+      if (message.startsWith('bestmove')) {
+        // The message format is "bestmove e2e4 ponder e7e5"
+        final parts = message.split(' ');
+        if (parts.length >= 2) {
+          final bestMove = parts[1];
+
+          setState(() {
+            _engineMove = bestMove;
+            _isEngineThinking = false;
+          });
+
+          // Here, you would update your game state with the engine's move.
+          // For example, update the board UI and then wait for the user's next move.
+          _updateBoardWithEngineMove(bestMove);
+        }
       }
     });
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) {
-        setState(() {
-          controller.game.move('e4');
-        });
+
+    // It's good practice to wait for the engine to be ready.
+    stockfish.state.addListener(() {
+      if (stockfish.state.value == StockfishState.ready) {
+        // Engine is ready, we can start interacting with it.
+        // For example, if it's black's turn to move immediately.
+        _requestEngineMove();
       }
     });
+  }
+
+  // 3. Create a function to ask the engine for a move.
+  void _requestEngineMove() {
+    if (_isEngineThinking) return;
+
+    setState(() {
+      _isEngineThinking = true;
+      _engineMove = ''; // Clear previous move
+    });
+
+    // Send the current board position to the engine.
+    // Replace _currentFen with the actual FEN string of your game.
+    stockfish.stdin = 'position fen $_currentFen';
+
+    // Ask the engine to think for 2 seconds (2000 milliseconds) and find the best move.
+    stockfish.stdin = 'go movetime 2000';
+  }
+
+  // 4. A placeholder function to update your game state
+  void _updateBoardWithEngineMove(String move) {
+    // This is where you would integrate with your chess logic library.
+    // For example, using the 'chess' package:
+    /*
+    final game = chess.Chess.fromFEN(_currentFen);
+    game.move(move);
+    setState(() {
+      _currentFen = game.fen;
+      // Also update your visual chessboard here.
+    });
+    */
+    print("Board updated with move: $move. New FEN: $_currentFen");
+  }
+
+
+  @override
+  void dispose() {
+    // 5. IMPORTANT: Clean up resources.
+    _stockfishSubscription?.cancel(); // Stop listening to the stream.
+    stockfish.dispose(); // Shut down the engine process.
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Chessmasters'),
-        centerTitle: true,
+        title: const Text('Black Player (Stockfish)'),
       ),
-      backgroundColor: Colors.brown,
-      body: Column(
-        children: [
-          const SizedBox(height: 30),
-          Expanded(
-            flex: 4,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Center(
-                child: ChessBoard(
-                  controller: controller,
-                  boardColor: BoardColor.brown,
-                  boardOrientation: PlayerColor.black,
-                ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            Text(
+              'Current FEN:',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: SelectableText(_currentFen),
+            ),
+            const SizedBox(height: 20),
+            if (_isEngineThinking)
+              const CircularProgressIndicator()
+            else
+              Text(
+                _engineMove.isEmpty ? 'Waiting for move...' : 'Engine chose: $_engineMove',
+                style: Theme.of(context).textTheme.headlineMedium,
               ),
+            const SizedBox(height: 30),
+            ElevatedButton(
+              // You can use a button to manually trigger the engine's move.
+              // In a real game, you would call this automatically when it's black's turn.
+              onPressed: _isEngineThinking ? null : _requestEngineMove,
+              child: const Text("Get Black's Move"),
             ),
-          ),
-          ValueListenableBuilder<Chess>(
-            valueListenable: controller,
-            builder: (context, game, _) {
-              if (game.turn == chess.Color.WHITE) {
-                return const Text(
-                  "Računalo razmišlja...",
-                  style: TextStyle(fontSize: 20),
-                );
-              } else {
-                return Container();
-              }
-            },
-          ),
-          Expanded(
-            child: ValueListenableBuilder<Chess>(
-              valueListenable: controller,
-              builder: (context, game, _) {
-                return Text(
-                  controller.getSan().fold(
-                    '',
-                        (previousValue, element) =>
-                    '$previousValue\n${element ?? ''}',
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
