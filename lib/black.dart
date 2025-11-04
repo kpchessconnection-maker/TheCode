@@ -1,149 +1,193 @@
-
-// black.dart
+// lib/black.dart
 
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:stockfish/stockfish.dart';
-
-// You will also need a chess logic library to validate moves and manage the board state.
-// The 'chess' package is a popular choice. Add it to your pubspec.yaml.
-// Example: import 'package:chess/chess.dart' as chess;
+import 'package:flutter_chess_board/flutter_chess_board.dart';
+import 'package:chess/chess.dart' as chess_logic;
 
 class BlackPlayerScreen extends StatefulWidget {
-  // You might pass the initial board state (FEN string) to this screen.
   final String initialFen;
 
-  const BlackPlayerScreen({Key? key, required this.initialFen}) : super(key: key);
+  const BlackPlayerScreen({super.key, required this.initialFen});
 
   @override
-  _BlackPlayerScreenState createState() => _BlackPlayerScreenState();
+  State<BlackPlayerScreen> createState() => _BlackPlayerScreenState();
 }
 
 class _BlackPlayerScreenState extends State<BlackPlayerScreen> {
+  // 1. CONTROLLERS AND STATE VARIABLES
   late final Stockfish stockfish;
   StreamSubscription? _stockfishSubscription;
-  String _engineMove = '';
-  String _currentFen = '';
+  final ChessBoardController _boardController = ChessBoardController();
+  late chess_logic.Chess _game;
   bool _isEngineThinking = false;
 
   @override
   void initState() {
     super.initState();
-    _currentFen = widget.initialFen;
-
-    // 1. Create an instance of the Stockfish engine.
+    _game = chess_logic.Chess.fromFEN(widget.initialFen);
+    _boardController.loadFen(_game.fen);
     stockfish = Stockfish();
+    _stockfishSubscription = stockfish.stdout.listen(_handleEngineMessage);
 
-    // 2. Listen for output from the engine.
-    _stockfishSubscription = stockfish.stdout.listen((message) {
-      print("Engine says: $message"); // For debugging
-
-      // Check if the message contains the best move.
-      if (message.startsWith('bestmove')) {
-        // The message format is "bestmove e2e4 ponder e7e5"
-        final parts = message.split(' ');
-        if (parts.length >= 2) {
-          final bestMove = parts[1];
-
-          setState(() {
-            _engineMove = bestMove;
-            _isEngineThinking = false;
-          });
-
-          // Here, you would update your game state with the engine's move.
-          // For example, update the board UI and then wait for the user's next move.
-          _updateBoardWithEngineMove(bestMove);
+    stockfish.state.addListener(() {
+      if (stockfish.state.value == StockfishState.ready) {
+        print("Stockfish engine is ready.");
+        if (_game.turn == chess_logic.Color.BLACK) {
+          _requestEngineMove();
         }
       }
     });
-
-    // It's good practice to wait for the engine to be ready.
-    stockfish.state.addListener(() {
-      if (stockfish.state.value == StockfishState.ready) {
-        // Engine is ready, we can start interacting with it.
-        // For example, if it's black's turn to move immediately.
-        _requestEngineMove();
-      }
-    });
   }
 
-  // 3. Create a function to ask the engine for a move.
-  void _requestEngineMove() {
-    if (_isEngineThinking) return;
+  // 2. STOCKFISH COMMUNICATION
+  void _handleEngineMessage(String message) {
+    print("Engine says: $message");
 
+    if (message.startsWith('bestmove')) {
+      final parts = message.split(' ');
+      if (parts.length >= 2) {
+        final bestMove = parts[1];
+        // This was the line causing Error #1, the method it calls is now re-added below
+        _makeEngineMoveOnBoard(bestMove);
+      }
+    }
+  }
+
+  void _requestEngineMove() {
+    if (_isEngineThinking || _game.game_over) return;
     setState(() {
       _isEngineThinking = true;
-      _engineMove = ''; // Clear previous move
     });
-
-    // Send the current board position to the engine.
-    // Replace _currentFen with the actual FEN string of your game.
-    stockfish.stdin = 'position fen $_currentFen';
-
-    // Ask the engine to think for 2 seconds (2000 milliseconds) and find the best move.
-    stockfish.stdin = 'go movetime 2000';
+    stockfish.stdin = 'position fen ${_game.fen}';
+    stockfish.stdin = 'go movetime 1500';
   }
 
-  // 4. A placeholder function to update your game state
-  void _updateBoardWithEngineMove(String move) {
-    // This is where you would integrate with your chess logic library.
-    // For example, using the 'chess' package:
-    /*
-    final game = chess.Chess.fromFEN(_currentFen);
-    game.move(move);
+  // 3. GAME LOGIC AND UI INTERACTION
+
+  // --- FIX FOR ERROR #1: This method was missing and has been re-added ---
+  /// Called when Stockfish returns its best move.
+  void _makeEngineMoveOnBoard(String bestMove) {
+    // Use the chess logic to validate and apply the engine's move
+    final moveResult = _game.move(bestMove);
+
+    if (moveResult != null) {
+      // The engine's move was legal, now update the visual board
+      _boardController.makeMove(
+        from: bestMove.substring(0, 2),
+        to: bestMove.substring(2, 4),
+      );
+    }
+
     setState(() {
-      _currentFen = game.fen;
-      // Also update your visual chessboard here.
+      _isEngineThinking = false;
     });
-    */
-    print("Board updated with move: $move. New FEN: $_currentFen");
+
+    // Check for game over conditions
+    if (_game.in_checkmate) {
+      _showGameOverDialog("Checkmate!");
+    } else if (_game.in_draw) {
+      _showGameOverDialog("Draw!");
+    }
   }
 
+  // --- FIX FOR ERROR #2: Logic updated for new package API ---
+  /// Called when the player (White) makes a move on the board.
+  void _onPlayerMove() {
+    // A move was made on the UI.
+    // The flutter_chess_board controller automatically handles move validation.
+    // We just need to get the FEN of the new position from it.
+    final newFen = _boardController.getFen();
+
+    // Sync our local game instance with the new FEN from the board.
+    // We compare FENs to see if a legal move was actually made.
+    if (_game.fen != newFen) {
+      _game.load(newFen);
+      // A legal move was made, so now it's the engine's turn.
+      _requestEngineMove();
+    } else {
+      // An illegal move was attempted and the board controller reverted it.
+      print("Illegal move attempted.");
+    }
+  }
 
   @override
   void dispose() {
-    // 5. IMPORTANT: Clean up resources.
-    _stockfishSubscription?.cancel(); // Stop listening to the stream.
-    stockfish.dispose(); // Shut down the engine process.
+    _stockfishSubscription?.cancel();
+    stockfish.dispose();
+    _boardController.dispose();
     super.dispose();
   }
 
+  // 4. WIDGET BUILD METHOD AND UI HELPERS
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Black Player (Stockfish)'),
+        title: const Text('Play against Stockfish'),
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Text(
-              'Current FEN:',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: SelectableText(_currentFen),
-            ),
-            const SizedBox(height: 20),
-            if (_isEngineThinking)
-              const CircularProgressIndicator()
-            else
-              Text(
-                _engineMove.isEmpty ? 'Waiting for move...' : 'Engine chose: $_engineMove',
-                style: Theme.of(context).textTheme.headlineMedium,
+      body: Column(
+        children: [
+          Expanded(
+            child: Center(
+              child: ChessBoard(
+                controller: _boardController,
+                boardColor: BoardColor.brown,
+                boardOrientation: PlayerColor.white,
+                onMove: () {
+                  // This callback is correct, it takes no arguments
+                  _onPlayerMove();
+                },
               ),
-            const SizedBox(height: 30),
-            ElevatedButton(
-              // You can use a button to manually trigger the engine's move.
-              // In a real game, you would call this automatically when it's black's turn.
-              onPressed: _isEngineThinking ? null : _requestEngineMove,
-              child: const Text("Get Black's Move"),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text(
+                  "Stockfish is thinking...",
+                  style: TextStyle(fontSize: 18),
+                ),
+                if (_isEngineThinking)
+                  const Padding(
+                    padding: EdgeInsets.only(left: 10),
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 3),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showGameOverDialog(String title) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(title),
+          content: Text('The game has ended.'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Play Again'),
+              onPressed: () {
+                _game.reset();
+                _boardController.loadFen(_game.fen);
+                Navigator.of(context).pop();
+                setState(() {});
+              },
             ),
           ],
-        ),
-      ),
+        );
+      },
     );
   }
 }
