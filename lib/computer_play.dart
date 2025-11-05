@@ -1,4 +1,4 @@
-// lib/computer_play.dart (or whatever you have named this file)
+// lib/computer_play.dart
 
 import 'package:flutter/material.dart';
 import 'black.dart';
@@ -15,12 +15,13 @@ class ColorSelectionScreen extends StatefulWidget {
 }
 
 class _ColorSelectionScreenState extends State<ColorSelectionScreen> {
-  // --- FIX APPLIED HERE ---
-  // 1.  A 'currentFen' variable is now defined for this state.
-  // 2.  It's initialized with the standard FEN string for the start of a chess game.
-  //
-  // This variable will hold the state of the chessboard.
+  // This variable holds the state of the chessboard.
   String currentFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+
+  // --- NEW: State variable for difficulty ---
+  // We'll store the Stockfish "Skill Level" (0-20). Let's define our levels.
+  // We will default to Medium.
+  int _skillLevel = 10; // Easy: 1, Medium: 10, Hard: 20
 
   @override
   Widget build(BuildContext context) {
@@ -49,6 +50,39 @@ class _ColorSelectionScreenState extends State<ColorSelectionScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              // --- NEW: Difficulty Selection Menu ---
+              const Text(
+                'Select Difficulty',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.9),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: DropdownButton<int>(
+                  value: _skillLevel,
+                  isExpanded: true,
+                  underline: const SizedBox(), // Removes the default underline
+                  items: const [
+                    DropdownMenuItem(value: 1, child: Text('Easy')),
+                    DropdownMenuItem(value: 10, child: Text('Medium')),
+                    DropdownMenuItem(value: 20, child: Text('Hard')),
+                  ],
+                  onChanged: (int? newValue) {
+                    if (newValue != null) {
+                      setState(() {
+                        _skillLevel = newValue;
+                      });
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(height: 50), // Increased spacing
+
+              // --- Play as White Button ---
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   shadowColor: Colors.greenAccent,
@@ -62,6 +96,7 @@ class _ColorSelectionScreenState extends State<ColorSelectionScreen> {
                     MaterialPageRoute(
                       builder: (BuildContext context) {
                         // Assuming BodyPage is for playing as White
+                        // You might also want to pass the skill level here if BodyPage uses Stockfish
                         return const BodyPage();
                       },
                     ),
@@ -76,6 +111,8 @@ class _ColorSelectionScreenState extends State<ColorSelectionScreen> {
                 ),
               ),
               const SizedBox(height: 40),
+
+              // --- Play as Black Button ---
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   shadowColor: Colors.greenAccent,
@@ -88,10 +125,12 @@ class _ColorSelectionScreenState extends State<ColorSelectionScreen> {
                   Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (BuildContext context) {
-                        // --- FIX APPLIED HERE ---
-                        // Now 'currentFen' exists and can be passed to BlackPlayerScreen.
-                        // We also remove 'const' because 'currentFen' is a variable, not a compile-time constant.
-                        return BlackPlayerScreen(initialFen: currentFen);
+                        // --- MODIFIED: Pass the skill level to the BlackPlayerScreen ---
+                        // We will need to update BlackPlayerScreen to accept this.
+                        return BlackPlayerScreen(
+                          initialFen: currentFen,
+                           skillLevel: _skillLevel, // This line will be enabled in the next step
+                        );
                       },
                     ),
                   );
